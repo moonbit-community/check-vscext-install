@@ -1,0 +1,29 @@
+{
+  "name": "moonbit-vscode-install-command-test",
+  "displayName": "MoonBit VS Code Install Command Test",
+  "description": "Integration test harness for the Marketplace MoonBit VS Code extension install command.",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./out/extension.js",
+  "engines": {
+    "node": ">=20",
+    "vscode": "^1.90.0"
+  },
+  "activationEvents": [],
+  "scripts": {
+    "compile": "tsc -p tsconfig.build.json",
+    "test": "npm run compile && npm run test:unit:compiled && node scripts/run-with-display.mjs node ./out/test/runTest.js",
+    "test:direct": "npm run compile && npm run test:unit:compiled && node ./out/test/runTest.js",
+    "test:unit": "npm run compile && npm run test:unit:compiled",
+    "test:unit:compiled": "mocha \"out/test/unit/**/*.test.js\""
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^24.0.0",
+    "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.5.2",
+    "mocha": "^10.8.2",
+    "typescript": "^5.8.3"
+  }
+}
