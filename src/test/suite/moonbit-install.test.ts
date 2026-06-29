@@ -21,6 +21,7 @@ import {
   type OfficialMoonbitInstallChannel,
   mooncPathForMoonHome
 } from '../moonbit-toolchain.js';
+import { watchTaskExit } from '../task-watcher.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -67,8 +68,8 @@ describe('MoonBit VS Code install command', function () {
         'moonbit.install-moonbit should be registered'
       );
 
-      await logStep('execute moonbit.install-moonbit command', () =>
-        vscode.commands.executeCommand('moonbit.install-moonbit', { silent: true })
+      await logStep('execute moonbit.install-moonbit command until install task completes', () =>
+        executeInstallCommandUntilReady(10 * 60 * 1000)
       );
 
       const mooncPath = mooncPathForMoonHome(moonHome, process.platform);
@@ -129,6 +130,79 @@ function requiredEnv(name: string): string {
 function parseBooleanEnv(value: string): boolean {
   assert.ok(value === 'true' || value === 'false', `expected boolean environment value, got: ${value}`);
   return value === 'true';
+}
+
+type InstallCommandRaceOutcome =
+  | {
+      readonly kind: 'install-task-ended';
+      readonly exitCode: number | undefined;
+    }
+  | {
+      readonly kind: 'command-resolved';
+    }
+  | {
+      readonly kind: 'command-rejected';
+      readonly error: unknown;
+    };
+
+async function executeInstallCommandUntilReady(installTaskTimeoutMs: number): Promise<void> {
+  const installTask = watchTaskExit({
+    observer: vscode.tasks,
+    taskName: 'Install moonbit',
+    taskSource: 'moonbit',
+    timeoutMs: installTaskTimeoutMs
+  });
+
+  let commandSettled = false;
+  const commandOutcomePromise = vscode.commands.executeCommand('moonbit.install-moonbit', { silent: true }).then(
+    (): InstallCommandRaceOutcome => {
+      commandSettled = true;
+      return { kind: 'command-resolved' };
+    },
+    (error: unknown): InstallCommandRaceOutcome => {
+      commandSettled = true;
+      return { kind: 'command-rejected', error };
+    }
+  );
+
+  const taskOutcomePromise = installTask.promise.then(
+    (event): InstallCommandRaceOutcome => ({
+      kind: 'install-task-ended',
+      exitCode: event.exitCode
+    })
+  );
+
+  try {
+    const outcome = await Promise.race([taskOutcomePromise, commandOutcomePromise]);
+
+    if (outcome.kind === 'command-rejected') {
+      logDiagnostic(
+        `moonbit.install-moonbit command rejected before install task completion: ${formatError(outcome.error)}`
+      );
+      throw outcome.error;
+    }
+
+    if (outcome.kind === 'command-resolved') {
+      logDiagnostic('moonbit.install-moonbit command resolved before install task completion');
+      return;
+    }
+
+    if (outcome.exitCode !== 0) {
+      throw new Error(
+        `Install moonbit task exited with ${outcome.exitCode === undefined ? '<undefined>' : outcome.exitCode}`
+      );
+    }
+
+    logDiagnostic('Install moonbit task exited successfully with code 0');
+    if (!commandSettled) {
+      logDiagnostic(
+        'moonbit.install-moonbit command is still pending after task success; ' +
+          'continuing because the Marketplace extension may be waiting for a restart notification'
+      );
+    }
+  } finally {
+    installTask.dispose();
+  }
 }
 
 async function waitForExecutable(filePath: string, timeoutMs: number): Promise<void> {
