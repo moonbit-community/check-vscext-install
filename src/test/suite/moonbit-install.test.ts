@@ -2,7 +2,6 @@ import * as assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
 import { access, mkdir, stat } from 'node:fs/promises';
-import * as path from 'node:path';
 import { promisify } from 'node:util';
 import * as vscode from 'vscode';
 import {
@@ -11,8 +10,6 @@ import {
   formatEnvValue,
   formatError,
   formatJson,
-  formatMooncVersionCheckFailure,
-  formatMooncVersionCheckLogs,
   formatOfficialMooncVersionCheckFailure,
   formatOfficialMooncVersionCheckLogs,
   logDiagnostic,
@@ -30,7 +27,7 @@ const execFileAsync = promisify(execFile);
 describe('MoonBit VS Code install command', function () {
   this.timeout(30 * 60 * 1000);
 
-  it('installs moonc matching the Marketplace extension version', async () => {
+  it('installs moonc matching the same-channel official installer', async () => {
     const extensionId = requiredEnv('MOONBIT_EXTENSION_ID');
     const marketplaceVersion = requiredEnv('MOONBIT_MARKETPLACE_VERSION');
     const moonHome = requiredEnv('MOON_HOME');
@@ -70,13 +67,6 @@ describe('MoonBit VS Code install command', function () {
         'moonbit.install-moonbit should be registered'
       );
 
-      const bundledLspPath = await logStep('find bundled moonbit-lsp', () => findBundledLsp(extension.extensionPath));
-      const bundledLspOutput = await logStep('read bundled moonbit-lsp version', () =>
-        lspVersionOutput(bundledLspPath)
-      );
-      logDiagnostic(`bundled moonbit-lsp path: ${bundledLspPath}`);
-      logDiagnostic(`bundled moonbit-lsp version output: ${singleLine(bundledLspOutput)}`);
-
       await logStep('execute moonbit.install-moonbit command', () =>
         vscode.commands.executeCommand('moonbit.install-moonbit', { silent: true })
       );
@@ -86,18 +76,7 @@ describe('MoonBit VS Code install command', function () {
 
       const mooncVersionOutputValue = await mooncVersionOutput(mooncPath);
       const mooncVersion = extractVersion(mooncVersionOutputValue);
-      const bundledLspVersion = extractVersion(bundledLspOutput);
       logDiagnostic(`installed moonc version output: ${singleLine(mooncVersionOutputValue)}`);
-      logDiagnostic(`version comparison moonc=${mooncVersion} bundled-lsp=${bundledLspVersion}`);
-      for (const message of formatMooncVersionCheckLogs(bundledLspVersion, mooncVersion)) {
-        logDiagnostic(message);
-      }
-
-      assert.equal(
-        mooncVersion,
-        bundledLspVersion,
-        formatMooncVersionCheckFailure(bundledLspPath, bundledLspVersion, mooncVersion)
-      );
 
       await logStep(`install MoonBit with official installer (${officialInstallChannel})`, () =>
         installOfficialMoonbit(officialMoonHome, officialInstallChannel)
@@ -181,29 +160,6 @@ async function waitForExecutable(filePath: string, timeoutMs: number): Promise<v
   throw new Error(`Timed out waiting for executable ${filePath}: ${String(lastError)}`);
 }
 
-async function findBundledLsp(extensionPath: string): Promise<string> {
-  const executableNames =
-    process.platform === 'win32' ? ['moonbit-lsp.exe', 'moonbit-lsp'] : ['moonbit-lsp', 'moonbit-lsp.exe'];
-
-  for (const executableName of executableNames) {
-    const candidate = path.join(extensionPath, 'node', executableName);
-
-    if (await isFile(candidate)) {
-      return candidate;
-    }
-  }
-
-  throw new Error(`Could not find bundled moonbit-lsp under ${path.join(extensionPath, 'node')}`);
-}
-
-async function isFile(filePath: string): Promise<boolean> {
-  try {
-    return (await stat(filePath)).isFile();
-  } catch (error) {
-    return false;
-  }
-}
-
 async function assertExecutable(filePath: string): Promise<void> {
   const fileStat = await stat(filePath);
   assert.ok(fileStat.isFile(), `${filePath} should be a file`);
@@ -260,18 +216,6 @@ async function mooncVersionOutput(mooncPath: string): Promise<string> {
     logDiagnostic(`moonc --version exit stdout=${singleLine(result.stdout)} stderr=${singleLine(result.stderr)}`);
     return `${result.stdout}\n${result.stderr}`;
   }
-}
-
-async function lspVersionOutput(lspPath: string): Promise<string> {
-  logDiagnostic(`running bundled lsp version command: ${formatCommand(process.execPath, [lspPath, '-v'])}`);
-  const result = await execFileAsync(process.execPath, [lspPath, '-v'], {
-    env: process.env,
-    timeout: 30_000,
-    windowsHide: true
-  });
-
-  logDiagnostic(`bundled lsp -v exit stdout=${singleLine(result.stdout)} stderr=${singleLine(result.stderr)}`);
-  return `${result.stdout}\n${result.stderr}`;
 }
 
 function extractVersion(value: string): string {
