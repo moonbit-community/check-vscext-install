@@ -60,33 +60,6 @@ export function formatJson(value: unknown): string {
   }
 }
 
-export function formatMooncVersionCheckLogs(
-  pluginRequestedVersion: string,
-  downloadedVersion: string
-): string[] {
-  const successMessage = `moonc version check succeeded: ${downloadedVersion}`;
-  const resultMessages =
-    pluginRequestedVersion === downloadedVersion ? formatGreenBox(successMessage) : ['moonc version check failed'];
-
-  return [
-    `plugin requested moonc version: ${pluginRequestedVersion}`,
-    `downloaded moonc version: ${downloadedVersion}`,
-    ...resultMessages
-  ];
-}
-
-export function formatMooncVersionCheckFailure(
-  bundledLspPath: string,
-  pluginRequestedVersion: string,
-  downloadedVersion: string
-): string {
-  return (
-    `installed moonc version should match the compiler version carried by ${bundledLspPath}; ` +
-    `plugin requested moonc version=${pluginRequestedVersion}; ` +
-    `downloaded moonc version=${downloadedVersion}`
-  );
-}
-
 export function formatOfficialMooncVersionCheckLogs(
   extensionInstalledVersion: string,
   officialInstallerVersion: string,

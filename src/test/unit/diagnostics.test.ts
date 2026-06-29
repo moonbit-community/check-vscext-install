@@ -5,8 +5,6 @@ import {
   formatDuration,
   formatEnvValue,
   formatJson,
-  formatMooncVersionCheckFailure,
-  formatMooncVersionCheckLogs,
   formatOfficialMooncVersionCheckFailure,
   formatOfficialMooncVersionCheckLogs,
   logStep
@@ -59,35 +57,6 @@ describe('diagnostic formatting', () => {
     });
 
     assert.deepEqual(messages, ['[diag] >>> demo', '[diag] <<< demo completed in 250ms']);
-  });
-
-  it('formats successful moonc version checks with the downloaded version', () => {
-    const successMessage = 'moonc version check succeeded: 1.2.3';
-    const border = `+${'-'.repeat(successMessage.length + 2)}+`;
-    const spacer = `|${' '.repeat(successMessage.length + 2)}|`;
-
-    assert.deepEqual(formatMooncVersionCheckLogs('1.2.3', '1.2.3'), [
-      'plugin requested moonc version: 1.2.3',
-      'downloaded moonc version: 1.2.3',
-      border,
-      spacer,
-      `| \u001b[32m${successMessage}\u001b[0m |`,
-      spacer,
-      border
-    ]);
-  });
-
-  it('formats failed moonc version checks with requested and downloaded versions', () => {
-    assert.deepEqual(formatMooncVersionCheckLogs('1.2.3', '1.2.4'), [
-      'plugin requested moonc version: 1.2.3',
-      'downloaded moonc version: 1.2.4',
-      'moonc version check failed'
-    ]);
-
-    assert.equal(
-      formatMooncVersionCheckFailure('/extension/node/moonbit-lsp', '1.2.3', '1.2.4'),
-      'installed moonc version should match the compiler version carried by /extension/node/moonbit-lsp; plugin requested moonc version=1.2.3; downloaded moonc version=1.2.4'
-    );
   });
 
   it('formats successful official installer moonc version checks', () => {
